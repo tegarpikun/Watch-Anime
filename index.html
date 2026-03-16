@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nonton Anime Gratis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .anime-card:hover { transform: scale(1.05); transition: 0.3s; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white font-sans">
+
+    <header class="p-5 bg-gray-800 shadow-xl text-center">
+        <h1 class="text-3xl font-bold text-blue-400">StreamAnime</h1>
+    </header>
+
+    <main class="container mx-auto p-5">
+        <div id="anime-list" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+            <p class="text-center col-span-full">Memuat daftar anime...</p>
+        </div>
+    </main>
+
+    <script>
+        // GANTI URL INI dengan Web App URL dari Google Apps Script kamu
+        const API_URL = "ISI_DENGAN_URL_DEPLOY_APPS_SCRIPT_KAMU";
+
+        async function loadAnime() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                const container = document.getElementById('anime-list');
+                container.innerHTML = '';
+
+                data.forEach(anime => {
+                    const card = `
+                        <div class="anime-card bg-gray-800 rounded-lg overflow-hidden shadow-lg cursor-pointer" 
+                             onclick="playVideo('${anime.link_video}')">
+                            <img src="${anime.thumbnail}" class="w-full h-48 object-cover">
+                            <div class="p-3">
+                                <h3 class="text-sm font-semibold truncate">${anime.judul}</h3>
+                                <p class="text-xs text-gray-400">Eps ${anime.episode}</p>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += card;
+                });
+            } catch (error) {
+                console.error("Gagal mengambil data:", error);
+            }
+        }
+
+        function playVideo(link) {
+            // Logika Iklan: Kamu bisa memicu pop-up iklan di sini sebelum membuka video
+            alert("Iklan muncul! (Simulasi)"); 
+            
+            // Redirect atau buka modal player
+            window.open(link, '_blank');
+        }
+
+        loadAnime();
+    </script>
+</body>
+</html>
