@@ -23,7 +23,7 @@
 
     <script>
         // GANTI URL INI dengan Web App URL dari Google Apps Script kamu
-        const API_URL = "ISI_DENGAN_URL_DEPLOY_APPS_SCRIPT_KAMU";
+        const API_URL = "https://script.google.com/macros/s/AKfycbzEWimw5LFonklESzgEm6yMdwvCPky4pCxQc1HrlnW5wsRy_jw2npLDtjbvthbKt3qgmw/exec";
 
         async function loadAnime() {
             try {
@@ -31,7 +31,19 @@
                 const data = await response.json();
                 const container = document.getElementById('anime-list');
                 container.innerHTML = '';
-
+                
+<div id="player-container" class="hidden mb-8 p-4 bg-black rounded-lg shadow-2xl">
+    <div class="relative pb-[56.25%] h-0 overflow-hidden">
+        <iframe id="video-iframe" 
+                src="" 
+                class="absolute top-0 left-0 w-full h-full" 
+                frameborder="0" 
+                allowfullscreen>
+        </iframe>
+    </div>
+    <button onclick="closePlayer()" class="mt-4 px-4 py-2 bg-red-600 rounded text-sm">Tutup Player</button>
+</div>
+                
                 data.forEach(anime => {
                     const card = `
                         <div class="anime-card bg-gray-800 rounded-lg overflow-hidden shadow-lg cursor-pointer" 
@@ -49,16 +61,31 @@
                 console.error("Gagal mengambil data:", error);
             }
         }
+function playVideo(link) {
+    const container = document.getElementById('player-container');
+    const iframe = document.getElementById('video-iframe');
 
-        function playVideo(link) {
-            // Logika Iklan: Kamu bisa memicu pop-up iklan di sini sebelum membuka video
-            alert("Iklan muncul! (Simulasi)"); 
-            
-            // Redirect atau buka modal player
-            window.open(link, '_blank');
-        }
+    // 1. Masukkan link video ke iframe
+    iframe.src = link;
 
-        loadAnime();
+    // 2. Munculkan container player
+    container.classList.remove('hidden');
+
+    // 3. Otomatis scroll ke atas agar player terlihat
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // 4. Trigger Iklan (Sesuai keinginan kamu)
+    // Kamu bisa meletakkan kode pop-under iklan di sini
+    alert("Iklan akan muncul sebelum video diputar!");
+}
+
+function closePlayer() {
+    const container = document.getElementById('player-container');
+    const iframe = document.getElementById('video-iframe');
+    
+    container.classList.add('hidden');
+    iframe.src = ""; // Menghentikan video saat ditutup
+}
     </script>
 </body>
 </html>
