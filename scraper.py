@@ -1,3 +1,12 @@
+# Tambahkan ini di baris paling atas scraper.py
+print(">>> DEBUG: SCRIPT DIMULAI")
+
+import requests
+# ... (kode lainnya)
+
+if __name__ == "__main__":
+    print(">>> DEBUG: MASUK KE EKSEKUSI UTAMA")
+    cari_link_terbaru()
 import requests
 from bs4 import BeautifulSoup
 import json
