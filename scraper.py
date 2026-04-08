@@ -2,60 +2,82 @@ import requests
 from bs4 import BeautifulSoup
 import time
 import json
+import sys
 
-# GANTI DENGAN URL DEPLOYMENT GOOGLE APPS SCRIPT KAMU
+# === KONFIGURASI ===
+# GANTI DENGAN URL DEPLOYMENT GOOGLE APPS SCRIPT KAMU (akhiran /exec)
 API_URL = "https://script.google.com/macros/s/AKfycbyYXpniK8KsEe3z1bfMbPQocLclT_HbbdawOAO_OqFr9xuMdNeEpLKpi6Fw4NY2TXAPnw/exec"
 
+# Header agar menyerupai browser asli (menghindari blokir server)
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1'
+}
+
 def ambil_video_embed(url_episode):
-    """Membongkar halaman episode untuk mencari link video yang bisa diputar"""
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
+    """Mencari link video player (iframe) di dalam halaman episode"""
     try:
-        res = requests.get(url_episode, headers=headers, timeout=10)
+        print(f"   [-] Membongkar halaman: {url_episode}")
+        res = requests.get(url_episode, headers=HEADERS, timeout=15)
+        if res.status_code != 200:
+            print(f"   [!] Gagal akses halaman episode. Status: {res.status_code}")
+            return None
+            
         soup = BeautifulSoup(res.text, 'html.parser')
         
-        # Mencari iframe yang biasanya berisi video (vtyu, blogger, dsb)
-        for ifrm in soup.find_all('iframe'):
+        # Mencari iframe (teknik dari gogoanime_scraper)
+        # Kita cari yang mengarah ke provider video populer
+        iframes = soup.find_all('iframe')
+        for ifrm in iframes:
             src = ifrm.get('src', '')
-            if src and any(p in src for p in ['vtyu', 'vidoza', 'blogger', 'ok.ru', 'youtube']):
+            if src and any(p in src for p in ['vtyu', 'vidoza', 'blogger', 'ok.ru', 'embed', 'stream']):
                 return src
         return None
-    except:
+    except Exception as e:
+        print(f"   [!] Error saat ambil embed: {e}")
         return None
 
 def jalankan_scraper():
-    base_url = "https://otakudesu.blog/"
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    target_web = "https://otakudesu.blog/"
     
-    print(">>> MEMULAI SCRAPING OTAKUDESU...")
-    
+    print(f"\n--- STEP 1: Akses {target_web} ---")
     try:
-        response = requests.get(base_url, headers=headers, timeout=10)
+        response = requests.get(target_web, headers=HEADERS, timeout=15)
+        print(f"Status Koneksi: {response.status_code}")
+        
+        if response.status_code != 200:
+            print("Gagal memuat halaman utama. Mungkin IP diblokir.")
+            return
+
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Mencari daftar update terbaru (biasanya dalam class 'utul')
+        # Mencari daftar update terbaru (biasanya di class 'utul')
         items = soup.find_all('div', class_='utul')
         
         if not items:
-            print(">>> ERROR: Tidak bisa menemukan daftar anime. Class website mungkin berubah.")
+            print("Gagal menemukan list anime. Struktur HTML mungkin berubah.")
             return
 
-        # Ambil 10 anime terbaru
-        for item in items[:10]:
+        print(f"Ditemukan {len(items)} update terbaru. Mengambil 5 teratas...")
+
+        for item in items[:5]:
             try:
                 judul = item.find('h3').text.strip()
                 link_eps = item.find('a')['href']
-                # Mengambil gambar thumbnail
                 thumb = item.find('img')['src'] if item.find('img') else ""
                 
-                print(f"\n>>> MENGAMBIL: {judul}")
+                print(f"\n> Judul: {judul}")
                 
-                # Masuk ke halaman episode untuk cari link video
+                # Ekstrak link video player
                 video_url = ambil_video_embed(link_eps)
                 
                 if video_url:
-                    # Menyiapkan data sesuai kebutuhan Apps Script kamu
+                    print(f"   [OK] Link ditemukan: {video_url[:50]}...")
+                    
+                    # Kirim ke Google Sheets
                     payload = {
                         "judul": judul,
                         "episode": "Terbaru",
@@ -63,21 +85,31 @@ def jalankan_scraper():
                         "thumbnail": thumb
                     }
                     
-                    # Mengirim data ke Google Sheets
-                    print(f"--- Mengirim ke Google Sheets...")
-                    r = requests.post(API_URL, json=payload, timeout=15)
-                    print(f"--- RESPON GOOGLE: {r.text}")
+                    print("   [-] Mengirim data ke Sheets...")
+                    r_gs = requests.post(API_URL, json=payload, timeout=15)
+                    print(f"   [-] Respon Sheets: {r_gs.text}")
                 else:
-                    print("--- SKIPPED: Tidak ada link video yang bisa diputar.")
+                    print("   [!] Tidak ada link video yang bisa diputar.")
                 
-                # Jeda agar tidak terkena blokir (Anti-Spam)
-                time.sleep(2)
+                time.sleep(3) # Jeda lebih lama agar tidak dianggap spam
                 
             except Exception as e:
-                print(f"--- ERROR PADA ITEM: {e}")
-                
+                print(f"   [!] Gagal memproses item: {e}")
+
     except Exception as e:
-        print(f">>> GAGAL AKSES WEBSITE: {e}")
+        print(f"ERROR FATAL: {e}")
 
 if __name__ == "__main__":
+    print("========================================")
+    print("      ANIME SCRAPER SYSTEM START       ")
+    print("========================================")
+    
+    # Cek apakah API_URL sudah diganti
+    if "URL_WEB_APP" in API_URL:
+        print("KESALAHAN: Kamu belum mengganti API_URL dengan link dari Google Apps Script!")
+        sys.exit()
+        
     jalankan_scraper()
+    print("\n========================================")
+    print("           SCRAPER SELESAI             ")
+    print("========================================")
