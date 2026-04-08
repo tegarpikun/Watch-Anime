@@ -4,7 +4,7 @@ import re
 import time
 
 # 1. KONFIGURASI API (Ganti dengan URL hasil Deploy terbaru)
-API_URL = "https://script.google.com/macros/s/AKfycbxzT1aXzxJML4fwr5aR6aMKkxbq1ASHbBAl1IMF4os3Gf-FRpaki0nagsBOCdK8_2evjg/exec"
+API_URL = "https://script.google.com/macros/s/AKfycbxUz-D3UC7SrsGU5e9_DeeeYBrza2lmGZWclYIx7-RIdgoYBatFPErDX79M9bV4WEirGA/exec"
 
 def send_to_sheets(judul, sumber, link, thumb):
     payload = {"judul": judul, "episode": sumber, "link_video": link, "thumbnail": thumb}
