@@ -1,13 +1,13 @@
 import requests
 from bs4 import BeautifulSoup
 import json
-import sys
+import re  # Tambahkan ini di paling atas agar lebih rapi
 
-# Konfigurasi - URL Web App kamu (Pastikan berakhiran /exec)
+# 1. KONFIGURASI (WAJIB ADA)
 API_URL = "https://script.google.com/macros/s/AKfycbxzT1aXzxJML4fwr5aR6aMKkxbq1ASHbBAl1IMF4os3Gf-FRpaki0nagsBOCdK8_2evjg/exec"
 
+# 2. FUNGSI PENGIRIM DATA (Menggunakan API_URL)
 def send_to_sheets(judul, eps, link, thumb):
-    """Fungsi mengirim data ke Google Sheets"""
     payload = {
         "judul": judul,
         "episode": eps,
@@ -15,71 +15,56 @@ def send_to_sheets(judul, eps, link, thumb):
         "thumbnail": thumb
     }
     try:
-        # Kirim data sebagai JSON
-        r = requests.post(API_URL, json=payload, timeout=30) 
+        # Di sini API_URL digunakan
+        r = requests.post(API_URL, json=payload, timeout=30)
         print(f">>> RESPON GOOGLE: {r.text}")
     except Exception as e:
         print(f">>> GAGAL KIRIM KE SHEETS: {e}")
 
+# 3. FUNGSI PEMBONGKAR (Yang kamu tanyakan)
 def ambil_data_anime(url_tujuan):
-    """Fungsi scraping detail satu episode"""
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     try:
-        print(f">>> SCRAPING DETAIL: {url_tujuan}")
+        print(f">>> MEMBONGKAR HALAMAN: {url_tujuan}")
         response = requests.get(url_tujuan, headers=headers, timeout=20)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # 1. Ambil Judul
-        judul_tag = soup.find('h1')
-        judul = judul_tag.text.strip() if judul_tag else "Judul Tidak Ditemukan"
+        judul = soup.find('h1').text.strip() if soup.find('h1') else "Tanpa Judul"
+        video_link = None
         
-        # 2. Ambil Iframe Video
-        iframe = soup.find('iframe', id='mediaplayer')
-        link_video = iframe.get('src') if iframe else None
+        # Cari di Iframe
+        all_iframes = soup.find_all('iframe')
+        for ifrm in all_iframes:
+            src = ifrm.get('src', '')
+            if any(key in src for key in ['blogger.com', 'google.com/video', 'ok.ru', 'vidoza']):
+                video_link = src
+                break
         
-        # 3. Ambil Thumbnail
-        thumb_tag = soup.find('meta', property='og:image')
-        thumbnail = thumb_tag.get('content') if thumb_tag else ""
+        # Cari di Teks Mentah jika Iframe gagal
+        if not video_link:
+            match = re.search(r'https?://www\.blogger\.com/video\.g\?token=[^"\']+', response.text)
+            if match:
+                video_link = match.group(0)
 
-        if link_video:
-            print(f">>> DATA VALID: {judul}")
-            send_to_sheets(judul, "Baru", link_video, thumbnail)
+        thumb = soup.find('meta', property='og:image').get('content', '') if soup.find('meta', property='og:image') else ""
+
+        if video_link:
+            if video_link.startswith('//'):
+                video_link = 'https:' + video_link
+            
+            print(f">>> BERHASIL! Link Video: {video_link}")
+            # MEMANGGIL FUNGSI KIRIM
+            send_to_sheets(judul, "Baru", video_link, thumb)
         else:
-            print(f">>> SKIP: Video tidak ditemukan di {url_tujuan}")
+            print(f">>> GAGAL: Tidak ada link video di halaman ini.")
             
     except Exception as e:
-        print(f">>> ERROR SCRAPING DETAIL: {e}")
+        print(f">>> ERROR FATAL: {e}")
 
+# 4. FUNGSI UTAMA (Looping)
 def cari_link_terbaru():
-    """Fungsi menyapu halaman depan untuk mencari list episode terbaru"""
-    url_home = "https://anoboy.my.id/" 
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    
-    try:
-        print(f">>> MENCARI UPDATE TERBARU DI: {url_home}")
-        res = requests.get(url_home, headers=headers, timeout=20)
-        soup = BeautifulSoup(res.text, 'html.parser')
-        
-        links = []
-        # Mencari semua tag <a> yang memiliki link ke /episode/
-        for a in soup.find_all('a', href=True):
-            href = a['href']
-            if "/episode/" in href:
-                # Pastikan link lengkap (tambahkan domain jika linknya relatif)
-                if href.startswith('/'):
-                    href = "https://anoboy.my.id" + href
-                links.append(href)
-        
-        # Hapus duplikat dan ambil 10 teratas agar tidak kena spam/limit
-        links = list(dict.fromkeys(links)) 
-        print(f">>> DITEMUKAN {len(links)} LINK POTENSIAL. MEMPROSES 10 TERBARU...")
+    # ... (kode fungsi cari_link_terbaru yang sebelumnya) ...
+    # Jangan lupa panggil ambil_data_anime(link) di sini
 
-        for link in links[:10]:
-            ambil_data_anime(link)
-            
-    except Exception as e:
-        print(f">>> ERROR SAAT MENCARI LINK: {e}")
-
-# --- EKSEKUSI ---
 if __name__ == "__main__":
     cari_link_terbaru()
