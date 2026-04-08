@@ -1,0 +1,24 @@
+name: Auto Update Anime
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Robot ini akan lari setiap 6 jam otomatis
+  workflow_dispatch:      # Tombol manual agar kamu bisa tes jalanin kapan saja
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout kode
+        uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      - name: Install Library
+        run: pip install requests beautifulsoup4
+
+      - name: Jalankan Scraper
+        run: python scraper.py
