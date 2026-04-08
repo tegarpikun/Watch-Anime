@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import json
 
 # Konfigurasi - Ganti dengan URL Apps Script kamu
-API_URL = "https://script.google.com/macros/s/AKfycby36Z8NiCRoUV5bTBm6i6U7n7r2mPbX2e8UO-xEnDSycLtCm8_yez7CkEKF1CE47oNPnw/exec"
+API_URL = "https://script.google.com/macros/s/AKfycbxzT1aXzxJML4fwr5aR6aMKkxbq1ASHbBAl1IMF4os3Gf-FRpaki0nagsBOCdK8_2evjg/exec"
 
 def ambil_data_anime(url_tujuan):
     headers = {'User-Agent': 'Mozilla/5.0'}
