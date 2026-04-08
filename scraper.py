@@ -1,103 +1,83 @@
-# Tambahkan ini di baris paling atas scraper.py
-print(">>> DEBUG: SCRIPT DIMULAI")
-
-import requests
-# ... (kode lainnya)
-
-if __name__ == "__main__":
-    print(">>> DEBUG: MASUK KE EKSEKUSI UTAMA")
-    cari_link_terbaru()
 import requests
 from bs4 import BeautifulSoup
-import json
 import re
-import sys
+import time
 
-# 1. KONFIGURASI
+# 1. KONFIGURASI API (Ganti dengan URL hasil Deploy terbaru)
 API_URL = "https://script.google.com/macros/s/AKfycbxzT1aXzxJML4fwr5aR6aMKkxbq1ASHbBAl1IMF4os3Gf-FRpaki0nagsBOCdK8_2evjg/exec"
 
-# 2. FUNGSI PENGIRIM DATA
-def send_to_sheets(judul, eps, link, thumb):
-    payload = {
-        "judul": judul,
-        "episode": eps,
-        "link_video": link,
-        "thumbnail": thumb
-    }
+def send_to_sheets(judul, sumber, link, thumb):
+    payload = {"judul": judul, "episode": sumber, "link_video": link, "thumbnail": thumb}
     try:
         r = requests.post(API_URL, json=payload, timeout=30)
-        print(f">>> RESPON GOOGLE: {r.text}")
-    except Exception as e:
-        print(f">>> GAGAL KIRIM KE SHEETS: {e}")
+        print(f">>> [TERKIRIM] {judul} ({sumber})")
+    except:
+        print(f">>> [GAGAL] Gagal mengirim data ke Sheets")
 
-# 3. FUNGSI PEMBONGKAR DETAIL
-def ambil_data_anime(url_tujuan):
+def bongkar_video(url):
+    """Mencari link video di berbagai provider (Blogger, Google, Anime, Drive, dll)"""
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     try:
-        print(f">>> MEMBONGKAR HALAMAN: {url_tujuan}")
-        response = requests.get(url_tujuan, headers=headers, timeout=20)
-        soup = BeautifulSoup(response.text, 'html.parser')
+        res = requests.get(url, headers=headers, timeout=15)
+        # Mencari link video langsung menggunakan pola teks (Regex)
+        # Mencakup Blogger, Vtyu, Google Drive, dan pola umum video lainnya
+        match = re.search(r'https?://(?:www\.blogger\.com/video\.g\?token=|vtyu\.to/|drive\.google\.com/file/d/|www\.fembed\.com/v/)[^"\']+', res.text)
+        if match:
+            return match.group(0)
         
-        judul = soup.find('h1').text.strip() if soup.find('h1') else "Tanpa Judul"
-        video_link = None
-        
-        # Cari di Iframe
-        all_iframes = soup.find_all('iframe')
-        for ifrm in all_iframes:
+        # Jika tidak ketemu lewat teks, cari di dalam tag iframe
+        soup = BeautifulSoup(res.text, 'html.parser')
+        for ifrm in soup.find_all('iframe'):
             src = ifrm.get('src', '')
-            if any(key in src for key in ['blogger.com', 'google.com/video', 'ok.ru', 'vidoza', 'facebook']):
-                video_link = src
-                break
-        
-        # Cari di Teks Mentah (Regex) jika Iframe gagal
-        if not video_link:
-            match = re.search(r'https?://www\.blogger\.com/video\.g\?token=[^"\']+', response.text)
-            if match:
-                video_link = match.group(0)
+            # Filter provider video populer di situs anime
+            if any(k in src for k in ['blogger', 'anime', 'google', 'ok.ru', 'vidoza', 'archive.org']):
+                return src
+    except:
+        return None
+    return None
 
-        thumb_tag = soup.find('meta', property='og:image')
-        thumb = thumb_tag.get('content', '') if thumb_tag else ""
-
-        if video_link:
-            if video_link.startswith('//'):
-                video_link = 'https:' + video_link
-            print(f">>> BERHASIL! Link Video: {video_link}")
-            send_to_sheets(judul, "Baru", video_link, thumb)
-        else:
-            print(f">>> GAGAL: Tidak ada link video di {url_tujuan}")
-            
-    except Exception as e:
-        print(f">>> ERROR FATAL DI DETAIL: {e}")
-
-# 4. FUNGSI UTAMA (Pencari Link di Homepage)
-def cari_link_terbaru():
-    url_home = "https://anoboy.my.id/" 
+def scrape_anime_sites(name, url, link_pattern):
+    """Fungsi untuk mengambil daftar anime dari berbagai sumber"""
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    
     try:
-        print(f">>> MENCARI UPDATE TERBARU DI: {url_home}")
-        res = requests.get(url_home, headers=headers, timeout=20)
+        print(f"\n>>> MENYAPU SUMBER: {name} - {url}")
+        res = requests.get(url, headers=headers, timeout=20)
         soup = BeautifulSoup(res.text, 'html.parser')
         
         links = []
         for a in soup.find_all('a', href=True):
             href = a['href']
-            # Ambil link yang mengarah ke halaman episode
-            if "/episode/" in href:
-                if href.startswith('/'):
-                    href = "https://anoboy.my.id" + href
+            # Mencari link yang mengarah ke konten video/episode
+            if any(p in href for p in link_pattern):
+                if href.startswith('/'): 
+                    domain = "/".join(url.split("/")[:3])
+                    href = domain + href
                 links.append(href)
         
-        # Hapus duplikat
-        links = list(dict.fromkeys(links)) 
-        print(f">>> DITEMUKAN {len(links)} LINK. MEMPROSES 10 TERATAS...")
-
-        for link in links[:10]:
-            ambil_data_anime(link)
-            
+        # Ambil 10 link unik terbaru
+        unique_links = list(dict.fromkeys(links))[:10]
+        for link in unique_links:
+            video = bongkar_video(link)
+            if video:
+                # Ambil judul dari halaman episode
+                p_res = requests.get(link, headers=headers)
+                p_soup = BeautifulSoup(p_res.text, 'html.parser')
+                judul = p_soup.find('h1').text.strip() if p_soup.find('h1') else "Judul Anime"
+                
+                # Kirim data ke Google Sheets
+                send_to_sheets(judul, name, video, "")
+                time.sleep(1) # Jeda agar tidak dianggap spam oleh Google
     except Exception as e:
-        print(f">>> ERROR DI HOMEPAGE: {e}")
+        print(f">>> ERROR DI {name}: {e}")
 
-# --- EKSEKUSI ---
 if __name__ == "__main__":
-    cari_link_terbaru()
+    # DAFTAR TARGET SITUS ANIME (Bisa kamu tambah lagi sesuai keinginan)
+    targets = [
+        {"name": "Anoboy", "url": "https://typemyessays.com//", "pattern": ["/episode/"]},
+        {"name": "Otakudesu", "url": "https://otakudesu.blog//", "pattern": ["/episode/"]},
+        {"name": "Gomunime", "url": "https://gomunime.top//", "pattern": ["/episode/"]}
+    ]
+
+    print(">>> MEMULAI BOT PENCARI ANIME MULTI-SUMBER...")
+    for target in targets:
+        scrape_anime_sites(target['name'], target['url'], target['pattern'])
