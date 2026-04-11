@@ -6,7 +6,7 @@ import sys
 
 # === KONFIGURASI ===
 # Masukkan URL Google Apps Script kamu di sini
-API_URL = "https://script.google.com/macros/s/AKfycbyYXpniK8KsEe3z1bfMbPQocLclT_HbbdawOAO_OqFr9xuMdNeEpLKpi6Fw4NY2TXAPnw/execw"
+API_URL = "https://script.google.com/macros/s/AKfycbyYXpniK8KsEe3z1bfMbPQocLclT_HbbdawOAO_OqFr9xuMdNeEpLKpi6Fw4NY2TXAPnw/exec"
 
 class UniversalAnimeScraper:
     def __init__(self):
@@ -101,5 +101,16 @@ class UniversalAnimeScraper:
         self.scrap_gomunime()
 
 if __name__ == "__main__":
+    print("=== MEMULAI PROSES SCRAPING ===")
     scraper = UniversalAnimeScraper()
-    scraper.run_all()
+    
+    print("1. Menjalankan Otakudesu...")
+    scraper.scrap_otakudesu()
+    
+    print("2. Menjalankan Anoboy...")
+    scraper.scrap_anoboy()
+    
+    print("3. Menjalankan Gomunime...")
+    scraper.scrap_gomunime()
+    
+    print("=== SEMUA PROSES SELESAI ===")
