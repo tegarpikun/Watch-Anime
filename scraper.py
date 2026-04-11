@@ -2,115 +2,102 @@ import requests
 from bs4 import BeautifulSoup
 import time
 import re
-import sys
+import random
+import urllib3
+
+# Menonaktifkan peringatan SSL Insecure (karena kita pakai verify=False nanti)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # === KONFIGURASI ===
-# Masukkan URL Google Apps Script kamu di sini
 API_URL = "https://script.google.com/macros/s/AKfycbx3ApBu4ynG8H8R-aRofIomjiLEJni3d2J0pEMLn7sTGWzSVWIzVgvZ_j6eTaBL08Yh5Q/exec"
 
 class UniversalAnimeScraper:
     def __init__(self):
         self.session = requests.Session()
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edge/123.0.0.0'
+        ]
+
+    def get_headers(self, referer=None):
+        headers = {
+            'User-Agent': random.choice(self.user_agents),
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Connection': 'keep-alive'
+            'Accept-Language': 'id-ID,id;q=0.9',
+            'Connection': 'keep-alive',
         }
+        if referer: headers['Referer'] = referer
+        return headers
 
     def kirim_ke_sheets(self, judul, eps, link, thumb):
-        """Mengirim data hasil scrap ke Google Sheets"""
-        payload = {
-            "judul": judul,
-            "episode": eps,
-            "link_video": link,
-            "thumbnail": thumb
-        }
+        payload = {"judul": judul.strip(), "episode": eps, "link_video": link, "thumbnail": thumb}
         try:
-            r = self.session.post(API_URL, json=payload, timeout=15)
-            print(f"   [Sheets] Respon: {r.text}")
+            r = self.session.post(API_URL, json=payload, timeout=30)
+            print(f"    [Sheets] Berhasil: {judul[:30]}...")
             return True
-        except Exception as e:
-            print(f"   [Sheets] Gagal Kirim: {e}")
-            return False
+        except: return False
 
     def scrap_otakudesu(self):
-        url = "https://otakudesu.blog/"
+        url = "https://otakudesu.blog/" 
         print(f"\n[1] Memeriksa Otakudesu: {url}")
         try:
-            res = self.session.get(url, headers=self.headers, timeout=10)
+            # TAMBAHAN: verify=False untuk melewati SSL Error
+            res = self.session.get(url, headers=self.get_headers(), timeout=15, verify=False)
             soup = BeautifulSoup(res.text, 'html.parser')
-            items = soup.find_all('div', class_='utul')
-            for item in items[:3]:
-                judul = item.find('h3').text.strip()
-                link_hal = item.find('a')['href']
-                thumb = item.find('img')['src'] if item.find('img') else ""
-                # Ambil link video dasar (iframe)
-                v_res = self.session.get(link_hal, headers=self.headers, timeout=10)
-                v_soup = BeautifulSoup(v_res.text, 'html.parser')
-                iframe = v_soup.find('iframe')
-                link_video = iframe['src'] if iframe else link_hal
-                self.kirim_ke_sheets(judul, "Baru", link_video, thumb)
+            # Gunakan selector yang lebih stabil
+            items = soup.select('.venz ul li') or soup.find_all('div', class_='utul')
+            
+            for item in items[:5]:
+                try:
+                    judul = item.find('h2').text if item.find('h2') else item.find('h3').text
+                    link = item.find('a')['href']
+                    thumb = item.find('img')['src'] if item.find('img') else ""
+                    self.kirim_ke_sheets(judul, "Baru", link, thumb)
+                except: continue
         except Exception as e:
             print(f"    Error Otakudesu: {e}")
 
     def scrap_anoboy(self):
-        url = "https://anoboy7.com/"
+        url = "anoboy7.com"
         print(f"\n[2] Memeriksa Anoboy: {url}")
         try:
-            res = self.session.get(url, headers=self.headers, timeout=10)
+            res = self.session.get(url, headers=self.get_headers(), timeout=15)
             soup = BeautifulSoup(res.text, 'html.parser')
-            # Anoboy biasanya menggunakan class 'home_index' atau 'column-content'
-            items = soup.find_all('div', class_='home_index')
-            for item in items[:3]:
-                judul = item.find('h3').text.strip() if item.find('h3') else "Anime Anoboy"
-                link_hal = item.find('a')['href']
-                thumb = item.find('img')['src'] if item.find('img') else ""
-                self.kirim_ke_sheets(judul, "Update", link_hal, thumb)
+            # Update selector Anoboy
+            items = soup.select('.column-content a') or soup.select('.home_index')
+            
+            for item in items[:5]:
+                try:
+                    link = item['href'] if item.name == 'a' else item.find('a')['href']
+                    judul = item.find('h3').text if item.find('h3') else item.get('title', 'Anime')
+                    thumb = item.find('img')['src'] if item.find('img') else ""
+                    self.kirim_ke_sheets(judul, "Update", link, thumb)
+                except: continue
         except Exception as e:
             print(f"    Error Anoboy: {e}")
 
     def scrap_gomunime(self):
-        url = "https://gomunime.top/"
+        url = "gomunime.top"
         print(f"\n[3] Memeriksa Gomunime: {url}")
         try:
-            # Gomunime seringkali butuh verifikasi header Referer
-            headers = self.headers.copy()
-            headers['Referer'] = url
-            res = self.session.get(url, headers=headers, timeout=10)
+            res = self.session.get(url, headers=self.get_headers(referer=url), timeout=15)
             soup = BeautifulSoup(res.text, 'html.parser')
-            # Gomunime biasanya menggunakan tag article atau div class 'utcl'
-            items = soup.select('.list-update .item') or soup.find_all('div', class_='utcl')
-            for item in items[:3]:
-                judul = item.find('h3').text.strip() if item.find('h3') else "Anime Gomunime"
-                link_hal = item.find('a')['href']
-                thumb = item.find('img')['src'] if item.find('img') else ""
-                self.kirim_ke_sheets(judul, "Terbaru", link_hal, thumb)
+            # Update selector Gomunime
+            items = soup.select('.list-update .item') or soup.select('article')
+            
+            for item in items[:5]:
+                try:
+                    judul = item.find('h3').text if item.find('h3') else item.find('h2').text
+                    link = item.find('a')['href']
+                    thumb = item.find('img')['src'] if item.find('img') else ""
+                    self.kirim_ke_sheets(judul, "Terbaru", link, thumb)
+                except: continue
         except Exception as e:
             print(f"    Error Gomunime: {e}")
 
-    def run_all(self):
-        if "URL_WEB_APP" in API_URL:
-            print("!!! ERROR: API_URL belum diisi !!!")
-            return
-        
-        self.scrap_otakudesu()
-        time.sleep(2)
-        self.scrap_anoboy()
-        time.sleep(2)
-        self.scrap_gomunime()
-
 if __name__ == "__main__":
-    print("=== MEMULAI PROSES SCRAPING ===")
     scraper = UniversalAnimeScraper()
-    
-    print("1. Menjalankan Otakudesu...")
     scraper.scrap_otakudesu()
-    
-    print("2. Menjalankan Anoboy...")
     scraper.scrap_anoboy()
-    
-    print("3. Menjalankan Gomunime...")
     scraper.scrap_gomunime()
-    
-    print("=== SEMUA PROSES SELESAI ===")
+    print("\n=== SELESAI ===")
