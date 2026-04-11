@@ -6,7 +6,7 @@ import sys
 
 # === KONFIGURASI ===
 # Masukkan URL Google Apps Script kamu di sini
-API_URL = "https://script.google.com/macros/s/AKfycbyYXpniK8KsEe3z1bfMbPQocLclT_HbbdawOAO_OqFr9xuMdNeEpLKpi6Fw4NY2TXAPnw/exec"
+API_URL = "https://script.google.com/macros/s/AKfycbx3ApBu4ynG8H8R-aRofIomjiLEJni3d2J0pEMLn7sTGWzSVWIzVgvZ_j6eTaBL08Yh5Q/exec"
 
 class UniversalAnimeScraper:
     def __init__(self):
